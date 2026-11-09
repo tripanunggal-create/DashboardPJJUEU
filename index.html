@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Monitoring Kelengkapan Bahan Ajar PJJ</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- PapaParse CDN for CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+    }
+    .dark .glass-effect {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.05);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.2);
+      border-radius: 999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+    }
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin-slow {
+      animation: spin-slow 8s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-200">
+
+  <!-- Main Container -->
+  <div class="flex flex-col min-h-screen">
+    
+    <!-- Header / Navigation Bar -->
+    <header class="sticky top-0 z-40 glass-effect border-b border-slate-200 dark:border-slate-800 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+          
+          <!-- Logo & Status -->
+          <div class="flex items-center space-x-3">
+            <div class="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+              <i class="fa-solid fa-graduation-cap text-2xl"></i>
+            </div>
+            <div>
+              <h1 class="font-bold text-base sm:text-lg leading-tight flex items-center gap-2">
+                Monitoring Kelengkapan Bahan Ajar PJJ
+                <span id="liveBadge" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
+                  <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Auto-Sync
+                </span>
+              </h1>
+              <p class="text-xs text-slate-500 dark:text-slate-400" id="syncStatus">Terhubung ke Google Sheets</p>
+            </div>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="flex items-center space-x-2 sm:space-x-3">
+            <button id="btnManualRefresh" onclick="fetchSheetData()" class="p-2 sm:px-3 sm:py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 transition shadow-sm active:scale-95">
+              <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
+              <span class="hidden sm:inline">Refresh Data</span>
+            </button>
+
+            <button onclick="toggleConfigModal()" class="p-2 sm:px-3 sm:py-2 text-xs font-semibold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg flex items-center gap-2 transition">
+              <i class="fa-solid fa-sliders"></i>
+              <span class="hidden sm:inline">Pengaturan Sheet</span>
+            </button>
+
+            <button id="darkModeToggle" onclick="toggleDarkMode()" class="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition">
+              <i class="fa-solid fa-moon text-lg dark:hidden"></i>
+              <i class="fa-solid fa-sun text-lg hidden dark:block"></i>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Body -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <!-- Sticky Top Container (Banner + 5 Stat Cards) -->
+      <div class="sticky top-16 z-30 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md pt-2 pb-4 space-y-4 border-b border-slate-200/60 dark:border-slate-800/60 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 transition-all">
+        
+        <!-- Formal Information Banner -->
+        <div id="noticeBanner" class="p-4 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div class="flex items-start gap-3">
+            <i class="fa-solid fa-chart-line text-emerald-600 dark:text-emerald-400 text-xl mt-0.5"></i>
+            <div>
+              <h2 class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Monitoring Kelengkapan Bahan Ajar PJJ</h2>
+              <p class="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
+                Pemantauan status dan progres kelengkapan bahan ajar pada seluruh mata kuliah PJJ, meliputi modul, PPT, kuis, tugas, dan video pembelajaran.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Metrics Grid (5 Interactive Status Cards) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4" id="statsContainer">
+          
+          <!-- Stat 1: Total Mata Kuliah -->
+          <div id="card-all" onclick="selectCardFilter('all')" class="stat-card cursor-pointer p-4 rounded-2xl bg-white dark:bg-slate-800 border-2 border-blue-500 ring-2 ring-blue-500/20 shadow-md transition-all flex items-center justify-between group">
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-blue-500 transition-colors">Total MK</p>
+              <h3 class="text-2xl font-black mt-1 text-slate-800 dark:text-white" id="statTotalRows">0</h3>
+              <p class="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1"><i class="fa-solid fa-book"></i> Semua Terdaftar</p>
+            </div>
+            <div class="w-10 h-10 bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center text-lg shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-all">
+              <i class="fa-solid fa-layer-group"></i>
+            </div>
+          </div>
+
+          <!-- Stat 2: MK Lengkap -->
+          <div id="card-lengkap" onclick="selectCardFilter('lengkap')" class="stat-card cursor-pointer p-4 rounded-2xl bg-white dark:bg-slate-800 border-2 border-transparent hover:border-emerald-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-emerald-500 transition-colors">MK Lengkap</p>
+              <h3 class="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400" id="statLengkap">0</h3>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1" id="pctLengkap">0% dari Total</p>
+            </div>
+            <div class="w-10 h-10 bg-emerald-500/10 text-emerald-600 rounded-xl flex items-center justify-center text-lg shrink-0 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+          </div>
+
+          <!-- Stat 3: MK Proses Produksi -->
+          <div id="card-proses" onclick="selectCardFilter('proses')" class="stat-card cursor-pointer p-4 rounded-2xl bg-white dark:bg-slate-800 border-2 border-transparent hover:border-amber-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-amber-500 transition-colors">Proses Produksi</p>
+              <h3 class="text-2xl font-black mt-1 text-amber-500 dark:text-amber-400" id="statProsesProduksi">0</h3>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1" id="pctProsesProduksi">0% dari Total</p>
+            </div>
+            <div class="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center text-lg shrink-0 group-hover:bg-amber-500 group-hover:text-white transition-all">
+              <i class="fa-solid fa-compact-disc animate-spin-slow"></i>
+            </div>
+          </div>
+
+          <!-- Stat 4: MK Dosen Belum Rekaman -->
+          <div id="card-rekaman" onclick="selectCardFilter('rekaman')" class="stat-card cursor-pointer p-4 rounded-2xl bg-white dark:bg-slate-800 border-2 border-transparent hover:border-purple-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-purple-500 transition-colors">Belum Rekaman</p>
+              <h3 class="text-2xl font-black mt-1 text-purple-600 dark:text-purple-400" id="statBelumRekaman">0</h3>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1" id="pctBelumRekaman">0% dari Total</p>
+            </div>
+            <div class="w-10 h-10 bg-purple-500/10 text-purple-600 rounded-xl flex items-center justify-center text-lg shrink-0 group-hover:bg-purple-500 group-hover:text-white transition-all">
+              <i class="fa-solid fa-video-slash"></i>
+            </div>
+          </div>
+
+          <!-- Stat 5: MK Tidak Lengkap -->
+          <div id="card-tidaklengkap" onclick="selectCardFilter('tidaklengkap')" class="stat-card cursor-pointer p-4 rounded-2xl bg-white dark:bg-slate-800 border-2 border-transparent hover:border-rose-500 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-rose-500 transition-colors">Tidak Lengkap</p>
+              <h3 class="text-2xl font-black mt-1 text-rose-600 dark:text-rose-400" id="statTidakLengkap">0</h3>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1" id="pctTidakLengkap">0% dari Total</p>
+            </div>
+            <div class="w-10 h-10 bg-rose-500/10 text-rose-600 rounded-xl flex items-center justify-center text-lg shrink-0 group-hover:bg-rose-500 group-hover:text-white transition-all">
+              <i class="fa-solid fa-circle-xmark"></i>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Analytics & Visuals Section -->
+      <div id="chartSection" class="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 shadow-sm space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-chart-line text-blue-500" id="sectionHeaderIcon"></i>
+            <h3 class="font-bold text-base text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              Visualisasi & Insight Data: 
+              <span id="activeFilterBadge" class="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 font-semibold transition-colors duration-300">
+                Semua Mata Kuliah
+              </span>
+            </h3>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Chart Container -->
+          <div class="lg:col-span-1 h-64 relative bg-slate-50/50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-700/50 flex flex-col justify-between">
+            <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+              <span class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5" id="chartHeaderTitle">
+                <i class="fa-solid fa-chart-pie text-blue-500" id="chartHeaderIcon"></i> Distribusi Status MK
+              </span>
+            </div>
+            <div class="relative flex-1 min-h-0 mt-2">
+              <canvas id="analyticsChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Interactive List Breakdown for Selected Card -->
+          <div class="lg:col-span-2 flex flex-col justify-between bg-slate-50/50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-700/50">
+            <div class="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-700/60 pb-2">
+              <h4 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-blue-500" id="listHeaderIcon"></i>
+                Daftar Ringkas MK (<span id="cardListCount">0</span> MK)
+              </h4>
+              <button onclick="selectCardFilter('all')" class="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:underline" id="btnResetFilter">
+                Tampilkan Semua <i class="fa-solid fa-arrows-rotate ml-0.5"></i>
+              </button>
+            </div>
+
+            <!-- Dynamic Table for Selected Card MKs -->
+            <div class="overflow-y-auto max-h-48 pr-1 space-y-2" id="cardDetailList">
+              <!-- Dynamically populated list items -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Component Progress Summary Bar Section (Collapsible) -->
+      <div class="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 shadow-sm space-y-4">
+        <div onclick="toggleComponentSummary()" class="flex items-center justify-between flex-wrap gap-2 cursor-pointer select-none group">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all">
+              <i class="fa-solid fa-chart-pie text-sm"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                Ringkasan Progres Komponen Bahan Ajar
+                <i id="summaryChevron" class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform duration-300"></i>
+              </h3>
+              <p class="text-[11px] text-slate-400">Akumulasi ketersediaan konten terhadap target keseluruhan MK</p>
+            </div>
+          </div>
+          <div class="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            <i class="fa-solid fa-rotate text-emerald-500 mr-1"></i> Update Otomatis
+          </div>
+        </div>
+
+        <div id="componentSummaryContent" class="overflow-hidden transition-all duration-300 ease-in-out">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-1">
+            
+            <!-- Modul Progress Card -->
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-book-open text-blue-500"></i> Modul
+                </span>
+                <span class="text-xs font-extrabold text-blue-600 dark:text-blue-400" id="progModulPct">0%</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                <div id="barModul" class="bg-blue-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                <span>Tersedia: <strong id="cntModulAvailable" class="text-slate-800 dark:text-slate-200">0</strong></span>
+                <span>Target: <strong id="cntModulTarget">0</strong></span>
+              </div>
+            </div>
+
+            <!-- PPT Progress Card -->
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-powerpoint text-amber-500"></i> PPT Presentation
+                </span>
+                <span class="text-xs font-extrabold text-amber-600 dark:text-amber-400" id="progPptPct">0%</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                <div id="barPpt" class="bg-amber-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                <span>Tersedia: <strong id="cntPptAvailable" class="text-slate-800 dark:text-slate-200">0</strong></span>
+                <span>Target: <strong id="cntPptTarget">0</strong></span>
+              </div>
+            </div>
+
+            <!-- Quiz Progress Card -->
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-circle-question text-emerald-500"></i> Quiz
+                </span>
+                <span class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400" id="progQuizPct">0%</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                <div id="barQuiz" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                <span>Tersedia: <strong id="cntQuizAvailable" class="text-slate-800 dark:text-slate-200">0</strong></span>
+                <span>Target: <strong id="cntQuizTarget">0</strong></span>
+              </div>
+            </div>
+
+            <!-- Tugas Progress Card -->
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-list-check text-indigo-500"></i> Tugas
+                </span>
+                <span class="text-xs font-extrabold text-indigo-600 dark:text-indigo-400" id="progTugasPct">0%</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                <div id="barTugas" class="bg-indigo-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                <span>Tersedia: <strong id="cntTugasAvailable" class="text-slate-800 dark:text-slate-200">0</strong></span>
+                <span>Target: <strong id="cntTugasTarget">0</strong></span>
+              </div>
+            </div>
+
+            <!-- Video Progress Card -->
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-video text-rose-500"></i> Video Pembelajaran
+                </span>
+                <span class="text-xs font-extrabold text-rose-600 dark:text-rose-400" id="progVideoPct">0%</span>
+              </div>
+              <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                <div id="barVideo" class="bg-rose-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                <span>Tersedia: <strong id="cntVideoAvailable" class="text-slate-800 dark:text-slate-200">0</strong></span>
+                <span>Target: <strong id="cntVideoTarget">0</strong></span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Complete Data Table Section -->
+      <div class="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-700/60 pb-4">
+          <div>
+            <h3 class="font-bold text-base text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-table text-emerald-600 dark:text-emerald-400"></i>
+              Tabel Detail Kelengkapan Bahan Ajar
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Seluruh data mentah dan detail komponen mata kuliah dari Google Sheets</p>
+          </div>
+
+          <!-- Controls: Search & Page Count -->
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-64">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="tableSearchInput" oninput="handleTableSearch()" placeholder="Cari MK, Kode, Dosen..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <button onclick="exportTableCSV()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl transition flex items-center gap-1.5">
+              <i class="fa-solid fa-file-csv text-emerald-600"></i>
+              <span class="hidden sm:inline">Export</span> CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Responsive Table Container -->
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead id="mainTableHead" class="bg-slate-100 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
+              <!-- Dynamic Table Headers -->
+            </thead>
+            <tbody id="mainTableBody" class="divide-y divide-slate-200 dark:divide-slate-700/60 bg-white dark:bg-slate-800/50">
+              <!-- Dynamic Table Rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Table Footer Pagination Info -->
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2">
+          <span>Menampilkan <strong id="displayedRowsCount" class="text-slate-800 dark:text-slate-200">0</strong> dari <strong id="totalRowsCount" class="text-slate-800 dark:text-slate-200">0</strong> data</span>
+          <span class="text-[11px] italic">Data diperbarui otomatis dari Google Sheets</span>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Modal Configuration for Sheet ID -->
+    <div id="configModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
+          <h3 class="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-emerald-600"></i> Pengaturan Google Sheet
+          </h3>
+          <button onclick="toggleConfigModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Spreadsheet ID atau URL Publik:</label>
+            <input type="text" id="inputSpreadsheetId" placeholder="17mw3GPtk-C_3tiUuqP6-xTKmaAz9gLxAvKmaUeNwn24" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Interval Sync Otomatis:</label>
+            <select id="selectSyncInterval" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="10000">Setiap 10 Detik</option>
+              <option value="30000" selected>Setiap 30 Detik</option>
+              <option value="60000">Setiap 1 Menit</option>
+              <option value="300000">Setiap 5 Menit</option>
+              <option value="0">Matikan Auto-Sync</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-end space-x-2">
+          <button onclick="toggleConfigModal()" class="px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg">Batal</button>
+          <button onclick="saveConfiguration()" class="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">Simpan & Sync</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Detail Mata Kuliah -->
+    <div id="courseDetailModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        
+        <!-- Modal Header -->
+        <div class="flex items-start justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
+          <div class="pr-4">
+            <span id="modalKodeMK" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">KODE</span>
+            <h3 id="modalNamaMK" class="text-base font-bold text-slate-800 dark:text-slate-100 mt-1 leading-snug">Nama Mata Kuliah</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5">
+              <i class="fa-solid fa-user-tie text-emerald-600"></i> Koordinator: <strong id="modalDosen" class="text-slate-700 dark:text-slate-300">-</strong>
+            </p>
+          </div>
+          <button onclick="closeCourseModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition">
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+
+        <!-- Progress Overview -->
+        <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold">
+            <span class="text-slate-700 dark:text-slate-200">Total Kelengkapan Bahan Ajar</span>
+            <span id="modalOverallPct" class="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">0%</span>
+          </div>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+            <div id="modalProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span>Status Saat Ini:</span>
+            <span id="modalStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700">Status</span>
+          </div>
+        </div>
+
+        <!-- Component List -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-list-check text-blue-500"></i> Detail Komponen Bahan Ajar
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs" id="modalComponentGrid">
+            <!-- Dynamically populated component statuses -->
+          </div>
+        </div>
+
+        <!-- Follow-up Action / Recommendations -->
+        <div class="p-3.5 rounded-xl border space-y-1.5" id="modalActionContainer">
+          <h4 class="text-xs font-bold flex items-center gap-1.5" id="modalActionTitle">
+            <i class="fa-solid fa-circle-info"></i> Informasi &amp; Tindak Lanjut
+          </h4>
+          <p class="text-xs leading-relaxed" id="modalActionBody">Detail tindak lanjut akan ditampilkan di sini.</p>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+          <button onclick="closeCourseModal()" class="px-4 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition">
+            Tutup
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-200 dark:border-slate-800 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+      <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <p>Dashboard Monitoring Kelengkapan Bahan Ajar PJJ &bull; Auto-Sync Enabled</p>
+        <p>Built with Tailwind CSS & PapaParse & Chart.js</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    // Global State Variables
+    let spreadsheetId = "17mw3GPtk-C_3tiUuqP6-xTKmaAz9gLxAvKmaUeNwn24";
+    let rawHeaders = [];
+    let rawSheetData = [];
+    let filteredData = [];
+    let analyticsChartInstance = null;
+    let autoSyncTimer = null;
+    let syncIntervalMs = 30000;
+    let activeCardFilter = 'all';
+    let isSummaryOpen = true;
+
+    // Status Dynamic Theme Configuration
+    const categoryThemeMap = {
+      'all': {
+        name: 'Semua Mata Kuliah',
+        badgeClass: 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300',
+        iconColor: 'text-blue-500',
+        btnColor: 'text-blue-600 dark:text-blue-400',
+        chartColors: ['#22c55e', '#f59e0b', '#a855f7', '#f43f5e']
+      },
+      'lengkap': {
+        name: 'MK Lengkap',
+        badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300',
+        iconColor: 'text-emerald-500',
+        btnColor: 'text-emerald-600 dark:text-emerald-400',
+        chartColors: ['#22c55e']
+      },
+      'proses': {
+        name: 'MK Proses Produksi',
+        badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300',
+        iconColor: 'text-amber-500',
+        btnColor: 'text-amber-600 dark:text-amber-400',
+        chartColors: ['#f59e0b']
+      },
+      'rekaman': {
+        name: 'MK Belum Rekaman',
+        badgeClass: 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300',
+        iconColor: 'text-purple-500',
+        btnColor: 'text-purple-600 dark:text-purple-400',
+        chartColors: ['#a855f7']
+      },
+      'tidaklengkap': {
+        name: 'MK Tidak Lengkap',
+        badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300',
+        iconColor: 'text-rose-500',
+        btnColor: 'text-rose-600 dark:text-rose-400',
+        chartColors: ['#f43f5e']
+      }
+    };
+
+    // Flexible Header Index Finder
+    function getColIdx(keywords) {
+      if (!rawHeaders || rawHeaders.length === 0) return -1;
+      return rawHeaders.findIndex(h => {
+        const headerStr = String(h).toLowerCase().trim();
+        return keywords.some(k => headerStr.includes(k.toLowerCase()));
+      });
+    }
+
+    // Initialize Dashboard
+    window.onload = function() {
+      const savedId = localStorage.getItem('sheet_dashboard_id');
+      if (savedId) spreadsheetId = savedId;
+
+      document.getElementById('inputSpreadsheetId').value = spreadsheetId;
+
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+
+      fetchSheetData();
+      setupAutoSync();
+    };
+
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+      if (analyticsChartInstance) renderChart();
+    }
+
+    function toggleComponentSummary() {
+      const content = document.getElementById('componentSummaryContent');
+      const chevron = document.getElementById('summaryChevron');
+      
+      if (!content || !chevron) return;
+      
+      isSummaryOpen = !isSummaryOpen;
+      
+      if (isSummaryOpen) {
+        content.style.maxHeight = content.scrollHeight + 'px';
+        content.style.opacity = '1';
+        content.classList.remove('py-0');
+        chevron.classList.remove('rotate-180');
+      } else {
+        content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.classList.add('py-0');
+        chevron.classList.add('rotate-180');
+      }
+    }
+
+    function toggleConfigModal() {
+      const modal = document.getElementById('configModal');
+      modal.classList.toggle('hidden');
+    }
+
+    function saveConfiguration() {
+      const inputId = document.getElementById('inputSpreadsheetId').value.trim();
+      const inputInterval = parseInt(document.getElementById('selectSyncInterval').value);
+
+      if (inputId) {
+        if (inputId.includes('spreadsheets/d/')) {
+          spreadsheetId = inputId.split('spreadsheets/d/')[1].split('/')[0];
+        } else {
+          spreadsheetId = inputId;
+        }
+        localStorage.setItem('sheet_dashboard_id', spreadsheetId);
+      }
+
+      syncIntervalMs = inputInterval;
+      toggleConfigModal();
+      fetchSheetData();
+      setupAutoSync();
+    }
+
+    function setupAutoSync() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      if (syncIntervalMs > 0) {
+        autoSyncTimer = setInterval(() => {
+          fetchSheetData(true);
+        }, syncIntervalMs);
+      }
+    }
+
+    function fetchSheetData(isAuto = false) {
+      const refreshIcon = document.getElementById('refreshIcon');
+      const syncStatus = document.getElementById('syncStatus');
+      
+      if (!isAuto && refreshIcon) refreshIcon.classList.add('animate-spin');
+      if (syncStatus) syncStatus.innerText = "Syncing with Google Sheets...";
+
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv`;
+
+      if (typeof Papa === 'undefined') {
+        if (syncStatus) syncStatus.innerText = "Error: PapaParse library not loaded.";
+        if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+        return;
+      }
+
+      Papa.parse(csvUrl, {
+        download: true,
+        header: false,
+        skipEmptyLines: 'greedy',
+        complete: function(results) {
+          if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+
+          if (results.data && results.data.length > 0) {
+            rawHeaders = results.data[0].map(cell => String(cell).trim());
+            
+            // Filter out empty rows and header duplicates
+            rawSheetData = results.data.slice(1).filter(row => {
+              const hasContent = row.some(cell => String(cell).trim() !== "");
+              const isHeaderRepeat = row[0] && String(row[0]).trim().toLowerCase().includes('kode');
+              
+              // Find Kode MK column dynamically to ensure only rows with valid Kode MK are counted as actual courses
+              const kodeColIdx = rawHeaders.findIndex(h => {
+                const headerStr = String(h).toLowerCase().trim();
+                return ['kode', 'code', 'id'].some(k => headerStr.includes(k));
+              });
+
+              let hasValidKode = true;
+              if (kodeColIdx !== -1) {
+                const kodeVal = row[kodeColIdx] !== undefined ? String(row[kodeColIdx]).trim() : '';
+                hasValidKode = kodeVal !== '' && !kodeVal.toLowerCase().includes('kode');
+              }
+
+              return hasContent && !isHeaderRepeat && hasValidKode;
+            });
+
+            if (syncStatus) syncStatus.innerText = `Updated: ${new Date().toLocaleTimeString()} (${rawSheetData.length} records)`;
+
+            calculateMetricsAndProgress();
+            applyFilters();
+          } else {
+            if (syncStatus) syncStatus.innerText = "Failed to load sheet content.";
+          }
+        },
+        error: function(err) {
+          if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+          if (syncStatus) syncStatus.innerText = "Error connecting to Google Sheets.";
+          console.error("PapaParse Error:", err);
+        }
+      });
+    }
+
+    function calculateMetricsAndProgress() {
+      const totalRows = rawSheetData.length;
+      document.getElementById('statTotalRows').innerText = totalRows;
+
+      const ketIdx = getColIdx(['keterangan', 'status', 'ket']);
+
+      let countLengkap = 0;
+      let countProses = 0;
+      let countRekaman = 0;
+      let countTidakLengkap = 0;
+
+      rawSheetData.forEach(row => {
+        const val = ketIdx !== -1 ? String(row[ketIdx] || '').trim().toLowerCase() : '';
+        if (val === 'lengkap' || val === 'sudah' || val === 'ada') {
+          countLengkap++;
+        } else if (val.includes('proses') || val.includes('produksi') || val.includes('sedang')) {
+          countProses++;
+        } else if (val.includes('rekaman') || val.includes('belum rekaman') || val.includes('take')) {
+          countRekaman++;
+        } else if (val === 'tidak lengkap') {
+          countTidakLengkap++;
+        }
+      });
+
+      document.getElementById('statLengkap').innerText = countLengkap;
+      document.getElementById('statProsesProduksi').innerText = countProses;
+      document.getElementById('statBelumRekaman').innerText = countRekaman;
+      document.getElementById('statTidakLengkap').innerText = countTidakLengkap;
+
+      const getPct = (val) => totalRows > 0 ? ((val / totalRows) * 100).toFixed(1) + '%' : '0%';
+      document.getElementById('pctLengkap').innerText = `${getPct(countLengkap)} dari Total`;
+      document.getElementById('pctProsesProduksi').innerText = `${getPct(countProses)} dari Total`;
+      document.getElementById('pctBelumRekaman').innerText = `${getPct(countRekaman)} dari Total`;
+      document.getElementById('pctTidakLengkap').innerText = `${getPct(countTidakLengkap)} dari Total`;
+
+      // Dynamic header keyword mapping for components
+      let modulIdx = getColIdx(['modul', 'module', 'bahan ajar']);
+      let pptIdx = getColIdx(['ppt', 'presentasi', 'powerpoint', 'slide', 'media']);
+      let quizIdx = getColIdx(['quiz', 'kuis', 'soal', 'evaluasi', 'tes', 'exam', 'form']);
+      let tugasIdx = getColIdx(['tugas', 'assignment', 'latihan', 'project', 'proyek', 'kerja']);
+      
+      // Comprehensive Video column lookup with key variations and direct index 8 fallback
+      let videoIdx = getColIdx(['video', 'vidio', 'rekaman', 'mp4', 'media video', 'link video', 'youtube', 'zoom']);
+      if (videoIdx === -1) {
+        if (rawHeaders.length > 8) {
+          videoIdx = 8;
+        }
+      }
+
+      // Direct fallbacks for standard column positions
+      if (modulIdx === -1) modulIdx = 4;
+      if (pptIdx === -1) pptIdx = 5;
+      if (quizIdx === -1) quizIdx = 6;
+      if (tugasIdx === -1) tugasIdx = 7;
+
+      /**
+       * Helper to calculate total available items and accumulated target per component.
+       * Handles fraction strings like "14/14", raw numbers "14", URLs/links, or boolean status tags ("Lengkap", "Ada", "Sudah").
+       */
+      function calculateComponentUnits(colIndex, defaultTargetPerCourse) {
+        let totalAvailableUnits = 0;
+        let totalTargetUnits = 0;
+
+        rawSheetData.forEach(row => {
+          const rawVal = (colIndex !== -1 && row[colIndex] !== undefined) ? String(row[colIndex]).trim() : '';
+          
+          let itemAvail = 0;
+          let itemTarget = defaultTargetPerCourse;
+
+          if (rawVal !== '' && rawVal !== '-' && rawVal !== '0') {
+            // Case 1: Format "X/Y" (e.g. "4/4", "12/14")
+            if (rawVal.includes('/')) {
+              const parts = rawVal.split('/');
+              const parsedAvail = parseFloat(parts[0].replace(/[^0-9.]/g, ''));
+              const parsedTarget = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
+
+              if (!isNaN(parsedAvail)) itemAvail = parsedAvail;
+              if (!isNaN(parsedTarget) && parsedTarget > 0) itemTarget = parsedTarget;
+            } 
+            // Case 2: Pure numeric value (e.g. 14, 10, "14 video")
+            else if (!isNaN(parseFloat(rawVal))) {
+              itemAvail = parseFloat(rawVal);
+              if (itemAvail > itemTarget && defaultTargetPerCourse > 0) {
+                itemAvail = Math.min(itemAvail, itemTarget);
+              }
+            } 
+            // Case 3: Links (YouTube, Google Drive links) or Descriptive text status (e.g. "Lengkap", "Sudah", "Ada", "OK")
+            else {
+              const valLower = rawVal.toLowerCase();
+              if (valLower.includes('http://') || valLower.includes('https://') || valLower.includes('drive.google') || valLower.includes('youtu')) {
+                itemAvail = defaultTargetPerCourse;
+              } else if (['lengkap', 'sudah', 'ada', 'ya', 'v', '√', '1', 'tersedia', 'ok', 'done'].some(k => valLower.includes(k)) &&
+                  !valLower.includes('belum') && !valLower.includes('tidak')) {
+                itemAvail = defaultTargetPerCourse;
+              } else if (valLower.includes('proses') || valLower.includes('sedang')) {
+                itemAvail = Math.round(defaultTargetPerCourse / 2);
+              } else {
+                const extractedNum = parseFloat(rawVal.replace(/[^0-9.]/g, ''));
+                if (!isNaN(extractedNum) && extractedNum > 0) {
+                  itemAvail = Math.min(extractedNum, itemTarget);
+                }
+              }
+            }
+          }
+
+          totalAvailableUnits += itemAvail;
+          totalTargetUnits += itemTarget;
+        });
+
+        if (totalTargetUnits === 0) {
+          totalTargetUnits = totalRows * defaultTargetPerCourse;
+        }
+
+        const pct = totalTargetUnits > 0 ? ((totalAvailableUnits / totalTargetUnits) * 100) : 0;
+        
+        return {
+          avail: Math.round(totalAvailableUnits),
+          target: Math.round(totalTargetUnits),
+          pct: pct < 100 ? pct.toFixed(1) : Math.round(pct).toString()
+        };
+      }
+
+      // Compute exact component units dynamically from Sheet
+      const modulStats = calculateComponentUnits(modulIdx, 14);
+      const pptStats = calculateComponentUnits(pptIdx, 14);
+      const quizStats = calculateComponentUnits(quizIdx, 14);
+      const tugasStats = calculateComponentUnits(tugasIdx, 4);
+      const videoStats = calculateComponentUnits(videoIdx, 14);
+
+      // Render Modul
+      document.getElementById('progModulPct').innerText = modulStats.pct + '%';
+      document.getElementById('barModul').style.width = Math.min(parseFloat(modulStats.pct), 100) + '%';
+      document.getElementById('cntModulAvailable').innerText = modulStats.avail;
+      document.getElementById('cntModulTarget').innerText = modulStats.target;
+
+      // Render PPT
+      document.getElementById('progPptPct').innerText = pptStats.pct + '%';
+      document.getElementById('barPpt').style.width = Math.min(parseFloat(pptStats.pct), 100) + '%';
+      document.getElementById('cntPptAvailable').innerText = pptStats.avail;
+      document.getElementById('cntPptTarget').innerText = pptStats.target;
+
+      // Render Quiz
+      document.getElementById('progQuizPct').innerText = quizStats.pct + '%';
+      document.getElementById('barQuiz').style.width = Math.min(parseFloat(quizStats.pct), 100) + '%';
+      document.getElementById('cntQuizAvailable').innerText = quizStats.avail;
+      document.getElementById('cntQuizTarget').innerText = quizStats.target;
+
+      // Render Tugas
+      document.getElementById('progTugasPct').innerText = tugasStats.pct + '%';
+      document.getElementById('barTugas').style.width = Math.min(parseFloat(tugasStats.pct), 100) + '%';
+      document.getElementById('cntTugasAvailable').innerText = tugasStats.avail;
+      document.getElementById('cntTugasTarget').innerText = tugasStats.target;
+
+      // Render Video
+      document.getElementById('progVideoPct').innerText = videoStats.pct + '%';
+      document.getElementById('barVideo').style.width = Math.min(parseFloat(videoStats.pct), 100) + '%';
+      document.getElementById('cntVideoAvailable').innerText = videoStats.avail;
+      document.getElementById('cntVideoTarget').innerText = videoStats.target;
+    }
+
+    function selectCardFilter(filterType) {
+      activeCardFilter = filterType;
+
+      // Highlight active card UI
+      const cards = ['all', 'lengkap', 'proses', 'rekaman', 'tidaklengkap'];
+      cards.forEach(c => {
+        const el = document.getElementById(`card-${c}`);
+        if (!el) return;
+        if (c === filterType) {
+          el.classList.add('border-blue-500', 'ring-2', 'ring-blue-500/20', 'shadow-md');
+          el.classList.remove('border-transparent');
+        } else {
+          el.classList.remove('border-blue-500', 'ring-2', 'ring-blue-500/20', 'shadow-md');
+          el.classList.add('border-transparent');
+        }
+      });
+
+      const theme = categoryThemeMap[filterType] || categoryThemeMap['all'];
+      
+      // Dynamic Badge Updates
+      const badgeEl = document.getElementById('activeFilterBadge');
+      if (badgeEl) {
+        badgeEl.className = `text-xs px-2.5 py-1 rounded-full font-semibold transition-colors duration-300 ${theme.badgeClass}`;
+        badgeEl.innerText = theme.name;
+      }
+
+      // Dynamic Section Header Icon Updates
+      const secHeaderIcon = document.getElementById('sectionHeaderIcon');
+      const chartHeaderIcon = document.getElementById('chartHeaderIcon');
+      const listHeaderIcon = document.getElementById('listHeaderIcon');
+      const btnResetFilter = document.getElementById('btnResetFilter');
+
+      if (secHeaderIcon) secHeaderIcon.className = `fa-solid fa-chart-line ${theme.iconColor}`;
+      if (chartHeaderIcon) chartHeaderIcon.className = `fa-solid fa-chart-pie ${theme.iconColor}`;
+      if (listHeaderIcon) listHeaderIcon.className = `fa-solid fa-list-check ${theme.iconColor}`;
+      if (btnResetFilter) btnResetFilter.className = `text-[11px] ${theme.btnColor} font-semibold hover:underline`;
+
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const ketIdx = getColIdx(['keterangan', 'status', 'ket']);
+
+      if (activeCardFilter === 'all') {
+        filteredData = [...rawSheetData];
+      } else {
+        filteredData = rawSheetData.filter(row => {
+          const val = ketIdx !== -1 ? String(row[ketIdx] || '').trim().toLowerCase() : '';
+          if (activeCardFilter === 'lengkap') {
+            return val === 'lengkap' || val === 'sudah' || val === 'ada';
+          } else if (activeCardFilter === 'proses') {
+            return val.includes('proses') || val.includes('produksi') || val.includes('sedang');
+          } else if (activeCardFilter === 'rekaman') {
+            return val.includes('rekaman') || val.includes('belum rekaman') || val.includes('take');
+          } else if (activeCardFilter === 'tidaklengkap') {
+            return val === 'tidak lengkap';
+          }
+          return false;
+        });
+      }
+
+      renderCardDetailList();
+      renderChart();
+      renderTable();
+    }
+
+    function renderCardDetailList() {
+      const container = document.getElementById('cardDetailList');
+      const countEl = document.getElementById('cardListCount');
+
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (countEl) countEl.innerText = filteredData.length;
+
+      if (filteredData.length === 0) {
+        container.innerHTML = `<div class="text-center py-6 text-xs text-slate-400 italic">Tidak ada mata kuliah untuk kategori ini.</div>`;
+        return;
+      }
+
+      const kodeIdx = getColIdx(['kode', 'code', 'id']);
+      const mkIdx = getColIdx(['mata kuliah', 'matakuliah', 'nama mk', 'course']);
+      const dosenIdx = getColIdx(['dosen', 'koordinator', 'pengampu', 'lecturer']);
+      const ketIdx = getColIdx(['keterangan', 'status', 'ket']);
+
+      filteredData.slice(0, 50).forEach((row, idx) => {
+        const kode = kodeIdx !== -1 ? row[kodeIdx] || 'MK' : 'MK';
+        const nama = mkIdx !== -1 ? row[mkIdx] || 'Mata Kuliah' : 'Mata Kuliah';
+        const dosen = dosenIdx !== -1 ? row[dosenIdx] || '-' : '-';
+        const ket = ketIdx !== -1 ? row[ketIdx] || 'Belum Rekaman' : 'Belum Rekaman';
+
+        let badgeBg = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+        const ketLower = String(ket).toLowerCase();
+        if (ketLower.includes('lengkap') && !ketLower.includes('tidak')) badgeBg = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300';
+        else if (ketLower.includes('proses')) badgeBg = 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300';
+        else if (ketLower.includes('rekaman')) badgeBg = 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300';
+        else if (ketLower.includes('tidak')) badgeBg = 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300';
+
+        const item = document.createElement('div');
+        item.className = 'p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between text-xs hover:border-blue-400 cursor-pointer hover:shadow-sm transition-all group';
+        item.onclick = function() {
+          openCourseModal(row);
+        };
+
+        item.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0 pr-2">
+            <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700 text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">${kode}</span>
+            <div class="truncate">
+              <p class="font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">${nama}</p>
+              <p class="text-[10px] text-slate-400 truncate"><i class="fa-solid fa-user-tie text-[9px] mr-1"></i>${dosen}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeBg}">${ket}</span>
+            <i class="fa-solid fa-chevron-right text-[10px] text-slate-300 group-hover:text-blue-500 transition-colors"></i>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // Modal Operations for Course Item Detail Popup
+    function openCourseModal(row) {
+      if (!row) return;
+
+      const kodeIdx = getColIdx(['kode', 'code', 'id']);
+      const mkIdx = getColIdx(['mata kuliah', 'matakuliah', 'nama mk', 'course']);
+      const dosenIdx = getColIdx(['dosen', 'koordinator', 'pengampu', 'lecturer']);
+      const ketIdx = getColIdx(['keterangan', 'status', 'ket']);
+
+      let modulIdx = getColIdx(['modul', 'module']);
+      let pptIdx = getColIdx(['ppt', 'presentasi', 'powerpoint']);
+      let quizIdx = getColIdx(['quiz', 'kuis', 'soal']);
+      let tugasIdx = getColIdx(['tugas', 'assignment', 'latihan']);
+      let videoIdx = getColIdx(['video', 'rekaman', 'media']);
+
+      if (modulIdx === -1) modulIdx = 4;
+      if (pptIdx === -1) pptIdx = 5;
+      if (quizIdx === -1) quizIdx = 6;
+      if (tugasIdx === -1) tugasIdx = 7;
+      if (videoIdx === -1 && rawHeaders.length > 8) videoIdx = 8;
+
+      const kode = kodeIdx !== -1 ? row[kodeIdx] || 'MK' : 'MK';
+      const nama = mkIdx !== -1 ? row[mkIdx] || 'Mata Kuliah' : 'Mata Kuliah';
+      const dosen = dosenIdx !== -1 ? row[dosenIdx] || '-' : '-';
+      const ket = ketIdx !== -1 ? row[ketIdx] || 'Belum Rekaman' : 'Belum Rekaman';
+
+      document.getElementById('modalKodeMK').innerText = kode;
+      document.getElementById('modalNamaMK').innerText = nama;
+      document.getElementById('modalDosen').innerText = dosen;
+
+      // Parse individual component values & targets
+      function parseComponent(colIndex, defaultTarget) {
+        const val = (colIndex !== -1 && row[colIndex] !== undefined) ? String(row[colIndex]).trim() : '';
+        let avail = 0;
+        let target = defaultTarget;
+
+        if (val !== '' && val !== '-' && val !== '0') {
+          if (val.includes('/')) {
+            const parts = val.split('/');
+            const pAvail = parseFloat(parts[0].replace(/[^0-9.]/g, ''));
+            const pTarget = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
+            if (!isNaN(pAvail)) avail = pAvail;
+            if (!isNaN(pTarget) && pTarget > 0) target = pTarget;
+          } else if (!isNaN(parseFloat(val))) {
+            avail = parseFloat(val);
+          } else {
+            const valLower = val.toLowerCase();
+            if (['lengkap', 'sudah', 'ada', 'ya', 'v', '√', '1', 'tersedia', 'ok'].some(k => valLower.includes(k)) &&
+                !valLower.includes('belum') && !valLower.includes('tidak')) {
+              avail = target;
+            } else if (valLower.includes('http://') || valLower.includes('https://')) {
+              avail = target;
+            } else {
+              const num = parseFloat(val.replace(/[^0-9.]/g, ''));
+              if (!isNaN(num)) avail = Math.min(num, target);
+            }
+          }
+        }
+        return { avail: Math.round(avail), target: Math.round(target), raw: val || '0' };
+      }
+
+      const modul = parseComponent(modulIdx, 14);
+      const ppt = parseComponent(pptIdx, 14);
+      const quiz = parseComponent(quizIdx, 14);
+      const tugas = parseComponent(tugasIdx, 4);
+      const video = parseComponent(videoIdx, 14);
+
+      const components = [
+        { name: 'Modul', data: modul, icon: 'fa-book-open', color: 'text-blue-500' },
+        { name: 'PPT Presentation', data: ppt, icon: 'fa-file-powerpoint', color: 'text-amber-500' },
+        { name: 'Quiz', data: quiz, icon: 'fa-circle-question', color: 'text-emerald-500' },
+        { name: 'Tugas', data: tugas, icon: 'fa-list-check', color: 'text-indigo-500' },
+        { name: 'Video Pembelajaran', data: video, icon: 'fa-video', color: 'text-rose-500' }
+      ];
+
+      // Build component grid UI
+      const grid = document.getElementById('modalComponentGrid');
+      grid.innerHTML = '';
+
+      let totalAvailAll = 0;
+      let totalTargetAll = 0;
+      const missingComponents = [];
+
+      components.forEach(comp => {
+        totalAvailAll += comp.data.avail;
+        totalTargetAll += comp.data.target;
+
+        const isComplete = comp.data.avail >= comp.data.target;
+        if (!isComplete) {
+          missingComponents.push(`${comp.name} (${comp.data.avail}/${comp.data.target})`);
+        }
+
+        const badgeClass = isComplete
+          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+          : 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300';
+        const iconSymbol = isComplete ? 'fa-circle-check' : 'fa-triangle-exclamation';
+
+        const card = document.createElement('div');
+        card.className = 'p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between';
+        card.innerHTML = `
+          <div class="flex items-center gap-2">
+            <i class="fa-solid ${comp.icon} ${comp.color}"></i>
+            <span class="font-semibold text-slate-700 dark:text-slate-200 text-xs">${comp.name}</span>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${badgeClass}">
+            <i class="fa-solid ${iconSymbol}"></i>
+            ${comp.data.avail}/${comp.data.target}
+          </span>
+        `;
+        grid.appendChild(card);
+      });
+
+      // Calculate Overall Percentage
+      const overallPct = totalTargetAll > 0 ? Math.min(Math.round((totalAvailAll / totalTargetAll) * 100), 100) : 0;
+      document.getElementById('modalOverallPct').innerText = overallPct + '%';
+      document.getElementById('modalProgressBar').style.width = overallPct + '%';
+
+      // Status Badge
+      const statusBadge = document.getElementById('modalStatusBadge');
+      const ketLower = String(ket).toLowerCase();
+      let badgeBg = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+      if (ketLower.includes('lengkap') && !ketLower.includes('tidak')) badgeBg = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300';
+      else if (ketLower.includes('proses')) badgeBg = 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300';
+      else if (ketLower.includes('rekaman')) badgeBg = 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300';
+      else if (ketLower.includes('tidak')) badgeBg = 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300';
+
+      statusBadge.className = `px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${badgeBg}`;
+      statusBadge.innerText = ket;
+
+      // Action Required & Recommendation logic
+      const actionContainer = document.getElementById('modalActionContainer');
+      const actionTitle = document.getElementById('modalActionTitle');
+      const actionBody = document.getElementById('modalActionBody');
+
+      if (missingComponents.length === 0 && (ketLower.includes('lengkap') || overallPct === 100)) {
+        actionContainer.className = 'p-3.5 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900/60 text-emerald-900 dark:text-emerald-200 space-y-1';
+        actionTitle.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400"></i> Memenuhi Syarat Integrasi`;
+        actionBody.innerText = 'Seluruh komponen bahan ajar sudah lengkap (100%). Memenuhi syarat untuk masuk Masterclass dan SIAKAD.';
+      } else if (ketLower.includes('rekaman') || ketLower.includes('take')) {
+        actionContainer.className = 'p-3.5 rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/40 dark:border-purple-900/60 text-purple-900 dark:text-purple-200 space-y-1';
+        actionTitle.innerHTML = `<i class="fa-solid fa-video-slash text-purple-600 dark:text-purple-400"></i> Menunggu Rekaman Dosen`;
+        actionBody.innerText = `Mata kuliah ini masih menunggu jadwal/proses rekaman video dari dosen pengampu (${dosen}). ${missingComponents.length > 0 ? 'Komponent belum lengkap: ' + missingComponents.join(', ') + '.' : ''}`;
+      } else {
+        actionContainer.className = 'p-3.5 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 space-y-1';
+        actionTitle.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-600 dark:text-amber-400"></i> Perlu Melengkapi Bahan Ajar`;
+        actionBody.innerHTML = `Masih terdapat <strong>${missingComponents.length} komponen</strong> yang belum memenuhi target:<br><span class="text-xs text-amber-800 dark:text-amber-300 font-medium">• ${missingComponents.join('<br>• ')}</span>`;
+      }
+
+      document.getElementById('courseDetailModal').classList.remove('hidden');
+    }
+
+    function closeCourseModal() {
+      document.getElementById('courseDetailModal').classList.add('hidden');
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('analyticsChart');
+      if (!ctx) return;
+
+      if (analyticsChartInstance) {
+        analyticsChartInstance.destroy();
+      }
+
+      const ketIdx = getColIdx(['keterangan', 'status', 'ket']);
+      const theme = categoryThemeMap[activeCardFilter] || categoryThemeMap['all'];
+
+      let labels = [];
+      let chartData = [];
+      let backgroundColors = [];
+
+      if (activeCardFilter === 'all') {
+        const counts = { 'Lengkap': 0, 'Proses Produksi': 0, 'Belum Rekaman': 0, 'Tidak Lengkap': 0 };
+        filteredData.forEach(row => {
+          const val = ketIdx !== -1 ? String(row[ketIdx] || '').trim().toLowerCase() : '';
+          if (val === 'lengkap' || val === 'sudah' || val === 'ada') counts['Lengkap']++;
+          else if (val.includes('proses') || val.includes('produksi')) counts['Proses Produksi']++;
+          else if (val.includes('rekaman') || val.includes('belum rekaman')) counts['Belum Rekaman']++;
+          else if (val.includes('tidak lengkap') || val.includes('kurang')) counts['Tidak Lengkap']++;
+        });
+
+        labels = Object.keys(counts);
+        chartData = Object.values(counts);
+        backgroundColors = theme.chartColors;
+      } else {
+        // Specific Status Selected
+        labels = [theme.name];
+        chartData = [filteredData.length];
+        backgroundColors = theme.chartColors;
+      }
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const textColor = isDark ? '#f1f5f9' : '#334155';
+
+      analyticsChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: chartData,
+            backgroundColor: backgroundColors,
+            borderWidth: 2,
+            borderColor: isDark ? '#1e293b' : '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                color: textColor,
+                font: { size: 10, family: 'Inter' },
+                boxWidth: 12
+              }
+            }
+          },
+          cutout: '65%'
+        }
+      });
+    }
+
+    function renderTable() {
+      const head = document.getElementById('mainTableHead');
+      const body = document.getElementById('mainTableBody');
+      const searchVal = (document.getElementById('tableSearchInput')?.value || '').toLowerCase();
+
+      if (!head || !body) return;
+
+      head.innerHTML = '';
+      body.innerHTML = '';
+
+      if (rawHeaders.length === 0) return;
+
+      // Identify key column indices for consistent display
+      const noIdx = getColIdx(['no', 'nomor', 'num']);
+      const kodeIdx = getColIdx(['kode', 'code', 'id']);
+      const mkIdx = getColIdx(['mata kuliah', 'matakuliah', 'nama mk', 'course']);
+      const dosenIdx = getColIdx(['dosen', 'koordinator', 'pengampu', 'lecturer']);
+      const modulIdx = getColIdx(['modul', 'module']);
+      const pptIdx = getColIdx(['ppt', 'presentasi', 'powerpoint', 'slide']);
+      const quizIdx = getColIdx(['quiz', 'kuis', 'soal']);
+      const tugasIdx = getColIdx(['tugas', 'assignment', 'latihan']);
+      const videoIdx = getColIdx(['video', 'rekaman', 'media']);
+      const ketIdx = getColIdx(['keterangan', 'status', 'ket']);
+
+      const trHead = document.createElement('tr');
+
+      // Explicit mapping for index positions to ensure KOLOM 5..9 are forced to correct labels
+      // Index 4 (Column 5) = MODUL
+      // Index 5 (Column 6) = PPT
+      // Index 6 (Column 7) = QUIZ
+      // Index 7 (Column 8) = TUGAS
+      // Index 8 (Column 9) = VIDEO
+      const indexHeaderOverride = {
+        4: 'MODUL',
+        5: 'PPT',
+        6: 'QUIZ',
+        7: 'TUGAS',
+        8: 'VIDEO'
+      };
+
+      rawHeaders.forEach((h, idx) => {
+        const th = document.createElement('th');
+        let headerLabel = String(h).trim();
+
+        // Clean up merged/group header titles if present in CSV
+        if (headerLabel.toUpperCase().includes('BAHAN AJAR TERSEDIA')) {
+          headerLabel = headerLabel.replace(/BAHAN AJAR TERSEDIA\s*[-_:]?\s*/gi, '').trim();
+        }
+
+        // Standardize clean, uppercase component names
+        if (idx === modulIdx) headerLabel = 'MODUL';
+        else if (idx === pptIdx) headerLabel = 'PPT';
+        else if (idx === quizIdx) headerLabel = 'QUIZ';
+        else if (idx === tugasIdx) headerLabel = 'TUGAS';
+        else if (idx === videoIdx) headerLabel = 'VIDEO';
+        else if (idx === noIdx) headerLabel = 'NO';
+        else if (idx === kodeIdx) headerLabel = 'KODE MK';
+        else if (idx === mkIdx) headerLabel = 'NAMA MK';
+        else if (idx === dosenIdx) headerLabel = 'KOORDINATOR';
+        else if (idx === ketIdx) headerLabel = 'KETERANGAN';
+
+        // Direct Index-based Override (forces Index 4..8 / Column 5..9)
+        if (indexHeaderOverride[idx]) {
+          headerLabel = indexHeaderOverride[idx];
+        }
+
+        // Styling based on column type
+        let alignClass = 'text-left';
+        if ([modulIdx, pptIdx, quizIdx, tugasIdx, videoIdx, noIdx].includes(idx) || (idx >= 4 && idx <= 8)) {
+          alignClass = 'text-center';
+        }
+
+        th.className = `px-3 py-3 font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap ${alignClass} uppercase tracking-wider text-[11px] border-b border-slate-200 dark:border-slate-700`;
+        th.innerText = headerLabel;
+        trHead.appendChild(th);
+      });
+      head.appendChild(trHead);
+
+      // Search & Filter Rows
+      const rowsToDisplay = filteredData.filter(row => {
+        if (!searchVal) return true;
+        return row.some(cell => String(cell).toLowerCase().includes(searchVal));
+      });
+
+      document.getElementById('displayedRowsCount').innerText = rowsToDisplay.length;
+      document.getElementById('totalRowsCount').innerText = rawSheetData.length;
+
+      if (rowsToDisplay.length === 0) {
+        body.innerHTML = `<tr><td colspan="${rawHeaders.length}" class="text-center py-6 text-slate-400 italic">Tidak ada data ditemukan</td></tr>`;
+        return;
+      }
+
+      rowsToDisplay.forEach((row, rowIdx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors border-t border-slate-100 dark:border-slate-800/60';
+        
+        rawHeaders.forEach((_, colIdx) => {
+          const td = document.createElement('td');
+          let alignClass = 'text-left';
+          
+          if ([modulIdx, pptIdx, quizIdx, tugasIdx, videoIdx, noIdx].includes(colIdx) || (colIdx >= 4 && colIdx <= 8)) {
+            alignClass = 'text-center';
+          }
+
+          td.className = `px-3 py-2.5 whitespace-nowrap ${alignClass} text-slate-700 dark:text-slate-200 text-xs`;
+          
+          let cellVal = row[colIdx] !== undefined ? String(row[colIdx]).trim() : '-';
+          if (colIdx === noIdx && (!cellVal || cellVal === '-')) {
+            cellVal = String(rowIdx + 1);
+          }
+
+          // Format status / component badges for visual clarity
+          if ([modulIdx, pptIdx, quizIdx, tugasIdx, videoIdx].includes(colIdx) || (colIdx >= 4 && colIdx <= 8)) {
+            let defaultTarget = 14;
+            // Tugas has a default target of 4 unless specified otherwise
+            if (colIdx === tugasIdx || colIdx === 7) defaultTarget = 4;
+
+            let itemAvail = 0;
+            let itemTarget = defaultTarget;
+            let isComplete = false;
+
+            if (cellVal !== '' && cellVal !== '-' && cellVal !== '0') {
+              if (cellVal.includes('/')) {
+                const parts = cellVal.split('/');
+                const parsedAvail = parseFloat(parts[0].replace(/[^0-9.]/g, ''));
+                const parsedTarget = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
+
+                if (!isNaN(parsedAvail)) itemAvail = parsedAvail;
+                if (!isNaN(parsedTarget) && parsedTarget > 0) itemTarget = parsedTarget;
+                isComplete = itemAvail >= itemTarget;
+              } else if (!isNaN(parseFloat(cellVal))) {
+                itemAvail = parseFloat(cellVal);
+                isComplete = itemAvail >= defaultTarget;
+              } else {
+                const valLower = cellVal.toLowerCase();
+                if (['lengkap', 'sudah', 'ada', 'ya', 'v', '√', '1', 'tersedia', 'ok', 'done'].some(k => valLower.includes(k)) &&
+                    !valLower.includes('belum') && !valLower.includes('tidak')) {
+                  isComplete = true;
+                } else {
+                  const extractedNum = parseFloat(cellVal.replace(/[^0-9.]/g, ''));
+                  if (!isNaN(extractedNum)) {
+                    isComplete = extractedNum >= defaultTarget;
+                  } else {
+                    isComplete = false;
+                  }
+                }
+              }
+            } else {
+              isComplete = false;
+            }
+
+            if (isComplete) {
+              td.innerHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"><i class="fa-solid fa-check mr-1 text-[9px]"></i>${cellVal}</span>`;
+            } else {
+              td.innerHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300"><i class="fa-solid fa-xmark mr-1 text-[9px]"></i>${cellVal || '0'}</span>`;
+            }
+          } else if (colIdx === ketIdx) {
+            let badgeBg = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+            const ketLower = cellVal.toLowerCase();
+            if (ketLower.includes('lengkap') && !ketLower.includes('tidak')) {
+              badgeBg = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300';
+            } else if (ketLower.includes('proses')) {
+              badgeBg = 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300';
+            } else if (ketLower.includes('rekaman')) {
+              badgeBg = 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300';
+            } else if (ketLower.includes('tidak')) {
+              badgeBg = 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300';
+            }
+            td.innerHTML = `<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${badgeBg}">${cellVal}</span>`;
+          } else {
+            td.innerText = cellVal || '-';
+          }
+
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    function handleTableSearch() {
+      renderTable();
+    }
+
+    function exportTableCSV() {
+      if (filteredData.length === 0) return;
+      let csvContent = "data:text/csv;charset=utf-8," 
+        + [rawHeaders.join(","), ...filteredData.map(e => e.join(","))].join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Monitoring_Bahan_Ajar_PJJ_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
